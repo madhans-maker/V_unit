@@ -41,6 +41,8 @@ export default function AddPackageModal({
 }: AddPackageModalProps) {
   const [name, setName] = useState('');
   const [vendorId, setVendorId] = useState('');
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [showVendorSuggestions, setShowVendorSuggestions] = useState(false);
   const [status, setStatus] = useState<Package['status']>('in_process');
   const [description, setDescription] = useState('');
   const [blNo, setBlNo] = useState('');
@@ -60,6 +62,15 @@ export default function AddPackageModal({
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [pendingFiles, setPendingFiles] = useState<PendingSupportFile[]>([]);
 
+  const filteredVendors = vendors.filter((vendor) => {
+    const q = vendorSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      vendor.name.toLowerCase().includes(q) ||
+      vendor.mobile.toLowerCase().includes(q)
+    );
+  });
+
   const computedTotalAmount = (() => {
     const amount = parseFloat(amountPerCbm) || 0;
     const cbmValue = parseFloat(cbm) || 0;
@@ -72,6 +83,8 @@ export default function AddPackageModal({
   const resetForm = () => {
     setName('');
     setVendorId('');
+    setVendorSearch('');
+    setShowVendorSuggestions(false);
     setStatus('in_process');
     setDescription('');
     setBlNo('');
@@ -148,11 +161,17 @@ export default function AddPackageModal({
   useEffect(() => {
     if (editingPackage) {
       setName(editingPackage.name || '');
-      setVendorId(
+      const resolvedVendorId =
         editingPackage.vendorId ||
-          vendors.find((vendor) => vendor.name === editingPackage.vendorName)?.id ||
+        vendors.find((vendor) => vendor.name === editingPackage.vendorName)?.id ||
+        '';
+      setVendorId(resolvedVendorId);
+      setVendorSearch(
+        vendors.find((vendor) => vendor.id === resolvedVendorId)?.name ||
+          editingPackage.vendorName ||
           ''
       );
+      setShowVendorSuggestions(false);
       setStatus(editingPackage.status || 'in_process');
       setDescription(editingPackage.description || '');
       setBlNo(editingPackage.blNo || '');
@@ -358,23 +377,58 @@ export default function AddPackageModal({
               />
             </div>
 
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Vendor *
               </label>
-              <select
-                value={vendorId}
-                onChange={(e) => setVendorId(e.target.value)}
+              <input
+                type="text"
+                value={vendorSearch}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setVendorSearch(value);
+                  setShowVendorSuggestions(true);
+                  const exact = vendors.find(
+                    (vendor) => vendor.name.toLowerCase() === value.trim().toLowerCase()
+                  );
+                  setVendorId(exact?.id || '');
+                }}
+                onFocus={() => setShowVendorSuggestions(true)}
+                onBlur={() => {
+                  setTimeout(() => setShowVendorSuggestions(false), 200);
+                }}
                 className="input-field"
+                placeholder="Type to search vendor"
                 required
-              >
-                <option value="">Select vendor</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </option>
-                ))}
-              </select>
+                autoComplete="off"
+              />
+              {showVendorSuggestions && (
+                <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1">
+                  {filteredVendors.length === 0 ? (
+                    <div className="px-4 py-2.5 text-sm text-gray-500">
+                      No vendors found
+                    </div>
+                  ) : (
+                    filteredVendors.map((vendor) => (
+                      <button
+                        key={vendor.id}
+                        type="button"
+                        onClick={() => {
+                          setVendorId(vendor.id);
+                          setVendorSearch(vendor.name);
+                          setShowVendorSuggestions(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 text-sm text-gray-700 transition-colors border-b border-gray-50 last:border-b-0"
+                      >
+                        <span className="font-medium">{vendor.name}</span>
+                        {vendor.mobile ? (
+                          <span className="text-gray-400 ml-2">{vendor.mobile}</span>
+                        ) : null}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
           

@@ -21,13 +21,23 @@ import { db } from '@/lib/firebase';
 import { Package } from '@/types';
 import { normalizePackageFromFirestore } from '@/lib/firestore-dates';
 import { isPaymentPending } from '@/lib/package-status';
+import { exportPackagesToExcel } from '@/lib/export-packages-excel';
 import { useAuth } from '@/context/AuthContext';
 import StatsCard from '@/components/StatsCard';
 import SearchFilter, { SearchType } from '@/components/SearchFilter';
 import PackageList from '@/components/PackageCard';
 import AddPackageModal from '@/components/AddPackageModal';
 import PackageTimelineDrawer from '@/components/PackageTimelineDrawer';
-import { Clock, CheckCircle, XCircle, ShieldCheck, Plus, AlertCircle } from 'lucide-react';
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
+  ShieldCheck,
+  Plus,
+  AlertCircle,
+  FileSpreadsheet,
+  Loader2,
+} from 'lucide-react';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -74,6 +84,7 @@ export default function DashboardHome() {
   const [searchType, setSearchType] = useState<SearchType>('name');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   const isSearching = searchTerm.trim().length > 0;
   const usesClientSideStatusFilter = activeStatus === 'payment_pending';
@@ -280,6 +291,31 @@ export default function DashboardHome() {
     setActiveStatus(null);
   };
 
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const packagesRef = collection(db, 'packages');
+      const constraints = buildServerConstraints();
+      const snap = await getDocs(query(packagesRef, ...constraints));
+      const all = snap.docs.map((d) =>
+        normalizePackageFromFirestore(d.id, d.data() as Record<string, unknown>)
+      );
+      const filtered = applyClientFilters(all);
+
+      if (filtered.length === 0) {
+        alert('No packages to export for the current filters.');
+        return;
+      }
+
+      exportPackagesToExcel(filtered, 'packages-report');
+    } catch (error) {
+      console.error('Error exporting packages:', error);
+      alert('Failed to export Excel report. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   return (
@@ -290,16 +326,30 @@ export default function DashboardHome() {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-500 mt-1">Manage your packages and track status</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingPackage(null);
-            setShowAddModal(true);
-          }}
-          className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-5 h-5" />
-          Add Package
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button
+            onClick={handleExportExcel}
+            disabled={isExporting || isLoading}
+            className="btn-secondary flex items-center gap-2 w-full sm:w-auto justify-center"
+          >
+            {isExporting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-5 h-5" />
+            )}
+            {isExporting ? 'Exporting...' : 'Export Excel'}
+          </button>
+          <button
+            onClick={() => {
+              setEditingPackage(null);
+              setShowAddModal(true);
+            }}
+            className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
+          >
+            <Plus className="w-5 h-5" />
+            Add Package
+          </button>
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}

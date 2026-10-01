@@ -2062,7 +2062,7 @@ function AlertCustomerButton({
             </h3>
             <p className="text-gray-600 mb-4 text-sm">
               This opens WhatsApp so you can choose a contact. The message will include
-              package details, the current stage status, and the stage update date.
+              vendor, package type, CTN, weight, CBM, and ETA date.
             </p>
             <div className="flex gap-3">
               <button
